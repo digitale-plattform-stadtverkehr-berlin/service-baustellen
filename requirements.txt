@@ -1,0 +1,6 @@
+pyproj
+requests
+pytz
+zeep
+azure.storage.blob
+apscheduler
