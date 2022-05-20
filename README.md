@@ -28,6 +28,6 @@ Wenn der Service in einer anderen Umgebung genutzt werden soll, sind einige Anga
 ## Docker Image bauen und in GitHub Registry pushen
 
 ```bash
-> docker build -tdocker.pkg.github.com/digitale-plattform-stadtverkehr-berlin/service-baustellen/service-baustellen:<TAG> .
+> docker build -t docker.pkg.github.com/digitale-plattform-stadtverkehr-berlin/service-baustellen/service-baustellen:<TAG> .
 > docker push docker.pkg.github.com/digitale-plattform-stadtverkehr-berlin/service-baustellen/service-baustellen:<TAG>
 ```

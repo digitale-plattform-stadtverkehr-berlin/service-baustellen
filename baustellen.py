@@ -55,7 +55,7 @@ def get_datasets_from_ocit(objectType):
     for ds in res['dataList']['ds']:
         data = ds['data']
         description = data['description'][0]
-        name = data['admin']['name']
+        id = data['admin']['id']
         subtype = data['admin']['subtype']
         severity = data['admin']['severity']
 
@@ -90,7 +90,7 @@ def get_datasets_from_ocit(objectType):
                         })
                     locations.append(coordinates)
             entries.append({
-                'name': name,
+                'id': id,
                 'subtype': subtype,
                 'severity': severity,
                 'description': description,
@@ -122,8 +122,8 @@ def transform_to_geojson(ocit_entries):
         'features': []}
     for entry in ocit_entries:
         feature = {'type': 'Feature'}
-        feature['name'] = entry['name']
         feature['properties'] = {
+            'id': entry['id'],
             'subtype': entry['subtype'],
             'severity': entry['severity'],
             'validity': entry['validity'],
@@ -175,7 +175,7 @@ def transform_to_geojson(ocit_entries):
         geojson['features'].append(feature)
     return geojson
 
-@sched.scheduled_job('interval', hours=1)
+@sched.scheduled_job('interval', minutes=10)
 def import_job():
         print(datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ") + ' - Run Import')
         entries = get_datasets_from_ocit('TrafficMessage_RoadWorks')
