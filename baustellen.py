@@ -49,6 +49,10 @@ def get_datasets_from_ocit(objectType):
         raise Exception("Unexpected response - no data list found" + str(res))
 
     print('Anzahl DS: '+str(len(res["dataList"]["ds"])))
+    limitFrom = TIMEZONE.localize(datetime.datetime.combine(datetime.datetime.now().astimezone(TIMEZONE) + datetime.timedelta(days=1), datetime.time.max))
+    limitTo = datetime.datetime.now().astimezone(TIMEZONE)
+    print('Timelimit From: ' +limitFrom.strftime("%d.%m.%Y %H:%M"))
+    print('Timelimit To: ' +limitTo.strftime("%d.%m.%Y %H:%M"))
 
     entries = []
 
@@ -66,10 +70,11 @@ def get_datasets_from_ocit(objectType):
         for validity in data['validity']:
             if validity['kind'] == 'validity':
                 valid_from = validity['from'].astimezone(TIMEZONE).strftime("%d.%m.%Y %H:%M")
+                is_valid = is_valid and (validity['from'].astimezone(TIMEZONE) <= limitFrom)
                 sort_key = validity['from'].astimezone(TIMEZONE)
                 if not validity['until'] == None:
                     valid_to = validity['until'].astimezone(TIMEZONE).strftime("%d.%m.%Y %H:%M")
-                    is_valid = validity['until'].astimezone(TIMEZONE) >= TIMEZONE.localize(datetime.datetime.now())
+                    is_valid = is_valid and (validity['until'].astimezone(TIMEZONE) >= limitTo)
 
         if is_valid:
             locations = []
@@ -175,7 +180,7 @@ def transform_to_geojson(ocit_entries):
         geojson['features'].append(feature)
     return geojson
 
-@sched.scheduled_job('interval', minutes=10)
+@sched.scheduled_job('interval', minutes=5)
 def import_job():
         print(datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ") + ' - Run Import')
         entries = get_datasets_from_ocit('TrafficMessage_RoadWorks')
