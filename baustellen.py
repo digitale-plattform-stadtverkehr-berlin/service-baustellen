@@ -4,12 +4,14 @@ import pytz
 import datetime
 from zeep import Client
 from zeep.plugins import HistoryPlugin
+from zeep.transports import Transport
 from pyproj import Proj, transform
 from apscheduler.schedulers.blocking import BlockingScheduler
 from azure.storage.blob import BlobClient
 
 client = None
 history  = HistoryPlugin()
+transport = Transport(timeout=10, operation_timeout=120)
 
 OCITC_USER = os.environ.get('OCIT_USER')
 OCITC_PW = os.environ.get('OCIT_PASSWORD')
@@ -34,7 +36,7 @@ def get_client():
     global client
     global history
     if client is None:
-        client = Client("http://vizconcs2.concert.viz/OCIT_CSOAP?wsdl=OCIT_CIfService.wsdl", plugins=[history])
+        client = Client("http://vizconcs2.concert.viz/OCIT_CSOAP?wsdl=OCIT_CIfService.wsdl", plugins=[history], transport=transport)
     return client.service
 
 
@@ -57,21 +59,26 @@ def get_datasets_from_ocit(objectType):
     entries = []
 
     for ds in res['dataList']['ds']:
+        objectState = ds['objectState'];
         data = ds['data']
         description = data['description'][0]
         id = data['admin']['id']
         subtype = data['admin']['subtype']
         severity = data['admin']['severity']
 
+        tstore = ds['tstore'].strftime("%Y-%m-%dT%H:%M:%S.%fZ");
+
         valid_from = None
         valid_to = None
         sort_key = None
         is_valid = True
+        is_future = False
         for validity in data['validity']:
             if validity['kind'] == 'validity':
                 valid_from = validity['from'].astimezone(TIMEZONE).strftime("%d.%m.%Y %H:%M")
                 is_valid = is_valid and (validity['from'].astimezone(TIMEZONE) <= limitFrom)
                 sort_key = validity['from'].astimezone(TIMEZONE)
+                is_future = is_future or  (validity['from'].astimezone(TIMEZONE) >= datetime.datetime.now().astimezone(TIMEZONE))
                 if not validity['until'] == None:
                     valid_to = validity['until'].astimezone(TIMEZONE).strftime("%d.%m.%Y %H:%M")
                     is_valid = is_valid and (validity['until'].astimezone(TIMEZONE) >= limitTo)
@@ -96,6 +103,8 @@ def get_datasets_from_ocit(objectType):
                     locations.append(coordinates)
             entries.append({
                 'id': id,
+                'tstore': tstore,
+                'objectState': objectState,
                 'subtype': subtype,
                 'severity': severity,
                 'description': description,
@@ -105,7 +114,8 @@ def get_datasets_from_ocit(objectType):
                 },
                 'direction': direction,
                 'locations': locations,
-                'sort_key': sort_key
+                'sort_key': sort_key,
+                'is_future': is_future
             })
     print("valid Entries: "+str(len(entries)))
     return entries
@@ -129,12 +139,16 @@ def transform_to_geojson(ocit_entries):
         feature = {'type': 'Feature'}
         feature['properties'] = {
             'id': entry['id'],
+            'tstore': entry['tstore'],
+            'objectState': entry['objectState'],
             'subtype': entry['subtype'],
             'severity': entry['severity'],
             'validity': entry['validity'],
             'direction': entry['direction'],
             'icon': 'warnung'
         }
+        if entry['is_future']:
+            feature['properties']['is_future'] = True
         if entry['subtype'] == 'Baustelle' or entry['subtype'] == 'Bauarbeiten':
             feature['properties']['icon'] = 'baustelle'
         elif entry['subtype'] == 'Sperrung':
