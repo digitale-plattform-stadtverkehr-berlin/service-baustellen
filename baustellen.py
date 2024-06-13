@@ -43,7 +43,7 @@ def get_client():
 def get_datasets_from_ocit(objectType):
     print('Load: '+objectType)
     res = load_datasets_from_ocit(objectType)
-    
+
     if(res["errorCode"] != 0):
         raise Exception("Server responded with error: " + str(res))
 
@@ -85,6 +85,7 @@ def get_datasets_from_ocit(objectType):
 
         if is_valid:
             locations = []
+            netrefs = []
             if len(data['location']) > 0:
                 location = data['location'][0]
                 direction = location['roaddescription']['direction']
@@ -101,22 +102,28 @@ def get_datasets_from_ocit(objectType):
                             'y': y
                         })
                     locations.append(coordinates)
-            entries.append({
-                'id': id,
-                'tstore': tstore,
-                'objectState': objectState,
-                'subtype': subtype,
-                'severity': severity,
-                'description': description,
-                'validity': {
-                    'from': valid_from,
-                    'to': valid_to
-                },
-                'direction': direction,
-                'locations': locations,
-                'sort_key': sort_key,
-                'is_future': is_future
-            })
+                for netref in location['netref']:
+                    netrefs.append({
+                        'id': netref['id'],
+                        'fromNode': netref['fromNode']
+                    })
+                entries.append({
+                    'id': id,
+                    'tstore': tstore,
+                    'objectState': objectState,
+                    'subtype': subtype,
+                    'severity': severity,
+                    'description': description,
+                    'validity': {
+                        'from': valid_from,
+                        'to': valid_to
+                    },
+                    'direction': direction,
+                    'locations': locations,
+                    'netrefs': netrefs,
+                    'sort_key': sort_key,
+                    'is_future': is_future
+                })
     print("valid Entries: "+str(len(entries)))
     return entries
 
@@ -191,6 +198,8 @@ def transform_to_geojson(ocit_entries):
                     for coord in location:
                         geometry['coordinates'] = [coord['x'],coord['y']]
                     feature['geometry']['geometries'].append(geometry)
+        if len(entry['netrefs']) >= 1:
+            feature['properties']['netrefs'] = entry['netrefs']
         geojson['features'].append(feature)
     return geojson
 
